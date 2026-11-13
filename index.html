@@ -8,9 +8,31 @@
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
+<div id="home">
+  <aside class="h-side">
+    <div class="h-logo">MAIL STUDIO</div>
+    <div class="h-ws"><span class="av">L</span> LA Marketing</div>
+    <nav class="h-nav">
+      <button data-page="emails" class="on">✉️ Mensagens de e-mail</button>
+      <button data-page="tpl">▦ Modelos</button>
+      <button data-page="cfg">⚙ Configurações</button>
+    </nav>
+  </aside>
+  <section class="h-main">
+    <header class="h-top">
+      <div class="h-newwrap"><button class="btn primary" id="h-new">✎ Nova mensagem</button><button class="btn primary" id="h-new-more" title="Mais opções">▾</button></div>
+      <input id="h-search" type="text" placeholder="Pesquisar por nome do e-mail ou pasta" autocomplete="off">
+      <input type="file" id="h-file" accept=".json,application/json" hidden>
+    </header>
+    <div class="h-note" id="h-note" hidden>Modo local: os e-mails ficam salvos só neste navegador. <button class="btn sm" id="h-note-btn">Conectar ao servidor</button></div>
+    <div class="h-scroll"><div id="h-body"></div></div>
+  </section>
+</div>
+
 <div id="app">
   <header id="topbar">
-    <div class="logo">MAIL STUDIO<small>LA Marketing</small></div>
+    <button class="btn" id="b-home" title="Voltar para os e-mails">← E-mails</button>
+    <div class="logo">MAIL STUDIO</div>
     <input id="doc-name" type="text" value="Novo e-mail" aria-label="Nome do e-mail">
     <button class="btn" id="b-undo" title="Desfazer (Ctrl+Z)">↶</button>
     <button class="btn" id="b-redo" title="Refazer (Ctrl+Y)">↷</button>
@@ -21,13 +43,10 @@
       <button data-d="mobile" title="Celular">📱 Mobile</button>
     </div>
     <span class="grow"></span>
-    <button class="btn" id="b-tpl">Modelos</button>
-    <button class="btn" id="b-open">Abrir</button>
-    <button class="btn" id="b-save">Salvar projeto</button>
+    <button class="btn" id="b-save">Baixar backup</button>
     <button class="btn" id="b-cfg" title="Configurações do servidor">⚙</button>
     <button class="btn" id="b-prev">Pré-visualizar</button>
     <button class="btn primary" id="b-export">Exportar HTML</button>
-    <input type="file" id="f-open" accept=".json,application/json" hidden>
   </header>
 
   <aside id="rail"></aside>
@@ -49,6 +68,8 @@
 <script src="assets/js/gifenc.js"></script>
 <script src="assets/js/countdown.js"></script>
 <script src="assets/js/export.js"></script>
+<script src="assets/js/store.js"></script>
 <script src="assets/js/app.js"></script>
+<script src="assets/js/home.js"></script>
 </body>
 </html>

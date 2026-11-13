@@ -118,23 +118,32 @@
   }
 
   /* ================= histórico / persistência ================= */
-  var persistTimer;
-  function persist() {
-    $('#savestate').textContent = 'Salvando…';
+  var persistTimer, pending = false;
+  var hooks = { save: null, cfg: null };
+  function setSaveState(t) { var e = $('#savestate'); if (e) e.textContent = t; }
+  function flush() {
     clearTimeout(persistTimer);
-    persistTimer = setTimeout(function () {
-      try { localStorage.setItem('ms_doc', JSON.stringify(doc)); $('#savestate').textContent = 'Salvo ✓'; }
-      catch (e) { $('#savestate').textContent = 'Não foi possível salvar'; }
-    }, 400);
+    if (!hooks.save || !pending) { pending = false; return Promise.resolve(); }
+    setSaveState('Salvando…');
+    return hooks.save(doc).then(function () { pending = false; setSaveState('Salvo ✓'); })
+      .catch(function (e) { setSaveState('Erro ao salvar'); toast('Não foi possível salvar: ' + e.message, true); throw e; });
   }
-  function commit() {
+  function persist() {
+    if (!hooks.save) return;
+    pending = true;
+    setSaveState('Salvando…');
+    clearTimeout(persistTimer);
+    persistTimer = setTimeout(function () { flush().catch(function () {}); }, 800);
+  }
+  window.addEventListener('beforeunload', function (e) { if (pending) { e.preventDefault(); e.returnValue = ''; } });
+  function commit(silent) {
     var s = JSON.stringify(doc);
     if (hist[hi] === s) return;
     hist = hist.slice(0, hi + 1);
     hist.push(s);
     if (hist.length > 100) hist.shift();
     hi = hist.length - 1;
-    persist();
+    if (silent !== true) persist();
     updateUndo();
   }
   function restore() {
@@ -158,7 +167,7 @@
     hist = []; hi = -1;
     $('#doc-name').value = doc.name || '';
     renderAll();
-    commit();
+    commit(true);
   }
 
   /* ================= DOM helper ================= */
@@ -943,15 +952,15 @@
     var body = h('div', null,
       wrapF('Endereço público da pasta /api/ do servidor', api),
       h('div', { class: 'hint' }, 'Usado no link do cronômetro dentro do e-mail e para enviar imagens. Precisa começar com https:// e terminar com /.'),
-      wrapF('Senha de upload de imagens', tok),
-      h('div', { class: 'hint' }, 'A senha fica salva apenas neste navegador.'));
+      wrapF('Senha do servidor (upload de imagens e e-mails na nuvem)', tok),
+      h('div', { class: 'hint' }, 'A senha fica salva apenas neste navegador. Sem servidor configurado, os e-mails ficam salvos só neste navegador.'));
     modal('Configurações do servidor', body, function (close) {
       return [
         h('button', { class: 'btn primary', onclick: function () {
           var v = api.value.trim();
           if (v && !/\/$/.test(v)) v += '/';
           cfg.apiBase = v; cfg.token = tok.value;
-          saveCfg(); close(); renderAll(); toast('Configurações salvas ✓');
+          saveCfg(); close(); renderAll(); toast('Configurações salvas ✓'); if (hooks.cfg) hooks.cfg();
         } }, 'Salvar'),
         h('button', { class: 'btn', onclick: close }, 'Cancelar')
       ];
@@ -977,23 +986,8 @@
   $('#b-prev').addEventListener('click', openPreview);
   $('#b-export').addEventListener('click', openExport);
   $('#b-cfg').addEventListener('click', openConfig);
-  $('#b-tpl').addEventListener('click', openTemplates);
-  $('#b-save').addEventListener('click', function () { download(slug(doc.name) + '.mailstudio.json', JSON.stringify(doc, null, 2), 'application/json'); toast('Projeto salvo no seu computador'); });
-  $('#b-open').addEventListener('click', function () { $('#f-open').click(); });
-  $('#f-open').addEventListener('change', function (e) {
-    var f = e.target.files[0];
-    if (!f) return;
-    var fr = new FileReader();
-    fr.onload = function () {
-      try {
-        var d = JSON.parse(fr.result);
-        if (!d.rows || !d.settings) throw new Error('x');
-        setDoc(d); toast('Projeto aberto ✓');
-      } catch (err) { toast('Arquivo inválido.', true); }
-    };
-    fr.readAsText(f);
-    e.target.value = '';
-  });
+  $('#b-save').addEventListener('click', function () { download(slug(doc.name) + '.mailstudio.json', JSON.stringify(doc, null, 2), 'application/json'); toast('Backup baixado'); });
+  $('#b-home').addEventListener('click', function () { flush().catch(function () {}).then(function () { location.hash = '#/'; }); });
   $('#doc-name').addEventListener('input', function (e) { doc.name = e.target.value; persist(); });
   $('#doc-name').addEventListener('change', commit);
   $$('#device button').forEach(function (b) {
@@ -1018,8 +1012,11 @@
   try { document.execCommand('defaultParagraphSeparator', false, 'p'); document.execCommand('styleWithCSS', false, true); } catch (e) {}
 
   /* ================= início ================= */
-  var saved = null;
-  try { saved = JSON.parse(localStorage.getItem('ms_doc') || 'null'); } catch (e) {}
-  setDoc(saved && saved.rows ? saved : TEMPLATES[0].make());
-  window.MailStudio = { get doc() { return doc; }, setDoc: setDoc, cfg: cfg };
+  setDoc(TEMPLATES[2].make());
+  window.MailStudio = {
+    get doc() { return doc; },
+    setDoc: setDoc, cfg: cfg, hooks: hooks, templates: TEMPLATES, flush: flush, openConfig: openConfig,
+    openDoc: function (d) { pending = false; setSaveState('Salvo ✓'); setDoc(d); },
+    ui: { h: h, modal: modal, toast: toast, download: download, slug: slug }
+  };
 })();

@@ -9,7 +9,8 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 COPY api /var/www/html/api
-RUN mkdir -p /var/www/html/api/cache /var/www/html/uploads \
+RUN mkdir -p /var/www/html/api/cache /var/www/html/api/data/docs /var/www/html/uploads \
  && printf '<FilesMatch "\\.(php|phtml|php[0-9]|pl|py|cgi|sh)$">\n  Require all denied\n</FilesMatch>\nOptions -Indexes\n' > /var/www/html/uploads/.htaccess \
  && printf 'Require all denied\n' > /var/www/html/api/cache/.htaccess \
+ && printf 'Require all denied\n' > /var/www/html/api/data/.htaccess \
  && chown -R www-data:www-data /var/www/html

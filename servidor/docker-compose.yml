@@ -11,7 +11,9 @@ services:
     volumes:
       - ms_uploads:/var/www/html/uploads
       - ms_cache:/var/www/html/api/cache
+      - ms_data:/var/www/html/api/data
 
 volumes:
   ms_uploads:
   ms_cache:
+  ms_data:
