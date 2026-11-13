@@ -215,6 +215,167 @@
       rowsHtml(doc, { apiBase: opts.apiBase, cdSrc: opts.cdSrc }) + '\n</table>\n' + ghostClose + '\n</td></tr></table>\n</body>\n</html>';
   }
 
+  /* ---------- código legível (identação + cores) ---------- */
+  var VOID = { img: 1, br: 1, hr: 1, meta: 1, link: 1, input: 1 };
+  var INLINE = { b: 1, strong: 1, i: 1, em: 1, u: 1, span: 1, font: 1, small: 1, sup: 1, sub: 1, s: 1, br: 1 };
+
+  function prettyCss(css, ind) {
+    var out = [], d = 0, parts = css.split(/([{};])/), buf = '';
+    function pad2() { return new Array(ind + d + 1).join('  '); }
+    parts.forEach(function (p) {
+      if (p === '{') { out.push(pad2() + buf.trim() + ' {'); buf = ''; d++; }
+      else if (p === ';') { if (buf.trim()) out.push(pad2() + buf.trim() + ';'); buf = ''; }
+      else if (p === '}') { if (buf.trim()) out.push(pad2() + buf.trim() + ';'); buf = ''; d = Math.max(0, d - 1); out.push(pad2() + '}'); }
+      else buf += p;
+    });
+    if (buf.trim()) out.push(pad2() + buf.trim());
+    return out;
+  }
+
+  function splitTag(tag, indent) {
+    var line = new Array(indent + 1).join('  ') + tag;
+    if (line.length <= 110) return [line];
+    var m = /^<([^\s>\/]+)([\s\S]*?)(\/?)>$/.exec(tag);
+    if (!m) return [line];
+    var attrs = [], re = /\s+([^\s=\/>]+)(?:\s*=\s*("[^"]*"|'[^']*'|[^\s>]+))?/g, a;
+    while ((a = re.exec(m[2]))) attrs.push([a[1], a[2]]);
+    if (attrs.length < 2) return [line];
+    var pad1 = new Array(indent + 1).join('  '), pad2 = pad1 + '  ';
+    var out = [pad1 + '<' + m[1]];
+    attrs.forEach(function (at, i) {
+      var txt = at[0];
+      if (at[1] != null) {
+        var v = at[1];
+        if (at[0].toLowerCase() === 'style' && v.length > 70 && v.indexOf('url(') < 0 && v.charAt(0) === '"') {
+          var decl = v.slice(1, -1).split(';').map(function (x) { return x.trim(); }).filter(Boolean);
+          v = '"\n' + decl.map(function (x) { return pad2 + '  ' + x + ';'; }).join('\n') + '"';
+        }
+        txt += '=' + v;
+      }
+      out.push(pad2 + txt + (i === attrs.length - 1 ? m[3] + '>' : ''));
+    });
+    return out;
+  }
+
+  function pretty(html) {
+    var toks = String(html).split(/(<!--[\s\S]*?-->|<style[\s\S]*?<\/style>|<[^>]+>)/).filter(function (t) { return t !== ''; });
+    var lines = [], run = [], indent = 0, aStack = [], inA = 0;
+    var pad = function () { return new Array(indent + 1).join('  '); };
+    function flush() {
+      if (!run.length) return;
+      var t = run.join('').replace(/\s+/g, ' ').trim();
+      run = [];
+      if (t) lines.push(pad() + t);
+    }
+    function tagInfo(t) {
+      var m = /^<(\/?)([a-zA-Z][^\s>\/]*)/.exec(t);
+      return m ? { close: !!m[1], name: m[2].toLowerCase(), self: /\/>$/.test(t) } : null;
+    }
+    for (var i = 0; i < toks.length; i++) {
+      var t = toks[i];
+      if (/^<!--/.test(t)) { flush(); lines.push(pad() + t.replace(/\s*\n\s*/g, ' ')); continue; }
+      if (/^<style/i.test(t)) {
+        flush();
+        var sm = /^(<style[^>]*>)([\s\S]*?)(<\/style>)$/i.exec(t);
+        lines.push(pad() + sm[1]);
+        prettyCss(sm[2], indent + 1).forEach(function (l) { lines.push(l); });
+        lines.push(pad() + sm[3]);
+        continue;
+      }
+      if (t.charAt(0) !== '<') { run.push(t); continue; }
+      if (/^<![^-]/.test(t) || /^<\?/.test(t)) { flush(); lines.push(pad() + t); continue; }
+      var info = tagInfo(t);
+      if (!info) { run.push(t); continue; }
+      var n = info.name;
+      if (INLINE[n]) { run.push(t); continue; }
+      if (n === 'a') {
+        if (!info.close) {
+          var nx = toks[i + 1];
+          var inl = nx !== undefined && (nx.charAt(0) !== '<' || (tagInfo(nx) && INLINE[tagInfo(nx).name]));
+          aStack.push(inl);
+          if (inl) { inA++; run.push(t); }
+          else { flush(); splitTag(t, indent).forEach(function (l) { lines.push(l); }); indent++; }
+        } else {
+          var was = aStack.pop();
+          if (was) { inA = Math.max(0, inA - 1); run.push(t); }
+          else { flush(); indent = Math.max(0, indent - 1); lines.push(pad() + t); }
+        }
+        continue;
+      }
+      if (n === 'img' && (run.length || inA)) { run.push(t); continue; }
+      flush();
+      if (info.close) { indent = Math.max(0, indent - 1); lines.push(pad() + t); continue; }
+      if (VOID[n] || info.self) { splitTag(t, indent).forEach(function (l) { lines.push(l); }); continue; }
+      var t1 = toks[i + 1], t2 = toks[i + 2];
+      if (t1 !== undefined && t1.charAt(0) !== '<' && t2 !== undefined) {
+        var i2 = tagInfo(t2);
+        if (i2 && i2.close && i2.name === n) { lines.push(pad() + t + t1.replace(/\s+/g, ' ').trim() + t2); i += 2; continue; }
+      }
+      if (t1 !== undefined) {
+        var i1 = tagInfo(t1);
+        if (i1 && i1.close && i1.name === n) { lines.push(pad() + t + t1); i += 1; continue; }
+      }
+      splitTag(t, indent).forEach(function (l) { lines.push(l); });
+      indent++;
+    }
+    flush();
+    return lines.join('\n');
+  }
+
+  function hesc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function hlCssLine(line) {
+    var e = hesc(line);
+    if (/\{\s*$/.test(e)) return e.replace(/^(\s*)(.*?)(\s*\{)\s*$/, '$1<span class="hs">$2</span>$3');
+    return e.replace(/^(\s*)([a-zA-Z-]+)(\s*:)(.*?)(;?)\s*$/, '$1<span class="hp">$2</span>$3<span class="hv">$4</span>$5');
+  }
+  function hlTag(tag) {
+    var m = /^<(\/?)([^\s>\/]+)([\s\S]*?)(\/?)>$/.exec(tag);
+    if (!m) return hesc(tag);
+    var attrs = m[3].replace(/(\s+)([^\s=\/>]+)(?:(\s*=\s*)("[^"]*"|'[^']*'|[^\s>]+))?/g, function (x, sp, name, eq, val) {
+      var o = sp + '<span class="ha">' + hesc(name) + '</span>';
+      if (val !== undefined) {
+        var v = hesc(val);
+        if (name.toLowerCase() === 'style') v = v.replace(/(^|[";\s])([a-zA-Z-]+)(\s*:)(?!\/\/)/g, '$1<span class="hp">$2</span>$3');
+        o += hesc(eq) + '<span class="hv">' + v + '</span>';
+      }
+      return o;
+    });
+    return '&lt;' + m[1] + '<span class="ht">' + hesc(m[2]) + '</span>' + attrs + m[4] + '&gt;';
+  }
+  function highlight(code) {
+    var parts = String(code).split(/(<!--[\s\S]*?-->|<style[\s\S]*?<\/style>|<[^>]+>)/);
+    return parts.map(function (t) {
+      if (t === '') return '';
+      if (/^<!--/.test(t)) return '<span class="hc">' + hesc(t) + '</span>';
+      if (/^<style/i.test(t)) {
+        var sm = /^(<style[^>]*>)([\s\S]*?)(<\/style>)$/i.exec(t);
+        return hlTag(sm[1]) + sm[2].split('\n').map(hlCssLine).join('\n') + hlTag(sm[3]);
+      }
+      if (/^<![^-]/.test(t)) return '<span class="hc">' + hesc(t) + '</span>';
+      if (t.charAt(0) === '<') return hlTag(t);
+      return hesc(t);
+    }).join('');
+  }
+
+  /* ---------- partes do e-mail (para copiar só um bloco) ---------- */
+  var TYPE_LABEL = { image: 'Imagem', text: 'Texto', button: 'Botão', spacer: 'Espaço', divider: 'Divisor', social: 'Redes', menu: 'Menu', html: 'HTML', countdown: 'Cronômetro' };
+  function snippets(doc, opts) {
+    var s = doc.settings, out = [];
+    doc.rows.forEach(function (row, ri) {
+      var innerW = s.width - row.pad.l - row.pad.r;
+      row.cols.forEach(function (blocks, ci) {
+        var colPx = Math.round(innerW * row.layout[ci] / 100);
+        blocks.forEach(function (b) {
+          var label = 'Faixa ' + (ri + 1) + (row.cols.length > 1 ? ', coluna ' + (ci + 1) : '') + ' · ' + (TYPE_LABEL[b.type] || b.type);
+          if (b.type === 'text') { var tx = String(b.html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); if (tx) label += ': ' + tx.slice(0, 28) + (tx.length > 28 ? '…' : ''); }
+          if (b.type === 'button' && b.text) label += ': ' + b.text.slice(0, 28);
+          out.push({ label: label, html: blockHtml(b, { colPx: colPx, apiBase: opts && opts.apiBase }, s) });
+        });
+      });
+    });
+    return out;
+  }
+
   /* ---------- verificações antes de exportar ---------- */
   function lint(doc, opts) {
     var out = [];
@@ -251,6 +412,7 @@
 
   root.MSExport = {
     esc: esc, FONT_OPTIONS: FONT_OPTIONS, SOCIAL: SOCIAL,
-    blockHtml: blockHtml, rowHtml: rowHtml, rowsHtml: rowsHtml, buildHtml: buildHtml, lint: lint
+    blockHtml: blockHtml, rowHtml: rowHtml, rowsHtml: rowsHtml, buildHtml: buildHtml, lint: lint,
+    pretty: pretty, highlight: highlight, snippets: snippets
   };
 })(window);

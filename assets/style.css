@@ -231,3 +231,9 @@ body.in-editor #home{display:none}
 .th-soc i{width:14px;height:6px;border-radius:2px;background:#b7bccb}
 .tpl .th{height:170px;border-radius:8px;margin-bottom:10px}
 a.btn{text-decoration:none;display:inline-block;color:inherit}
+
+.codeview{margin:0 0 6px;height:360px;overflow:auto;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:12px/1.55 ui-monospace,Menlo,Consolas,monospace;color:#c9d1d9;white-space:pre;tab-size:2;user-select:text}
+.codeview code{font:inherit}
+.codeview .ht{color:#7ee787}.codeview .ha{color:#79c0ff}.codeview .hv{color:#ffa657}
+.codeview .hc{color:#8b949e;font-style:italic}.codeview .hp{color:#d2a8ff}.codeview .hs{color:#ff7b72}
+.modal select{background:var(--bg);color:inherit;border:1px solid var(--line);border-radius:7px;padding:7px 9px;max-width:340px}

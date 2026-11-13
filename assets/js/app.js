@@ -927,16 +927,45 @@
   /* ----- exportar ----- */
   function openExport() {
     var issues = MSExport.lint(doc, { apiBase: cfg.apiBase });
-    var html = MSExport.buildHtml(doc, { apiBase: cfg.apiBase });
+    var full = MSExport.buildHtml(doc, { apiBase: cfg.apiBase });
+    var parts = MSExport.snippets(doc, { apiBase: cfg.apiBase });
     var lb = h('div', { class: 'lintbox' });
     if (!issues.length) lb.append(h('div', { class: 'lint ok' }, '✓ Tudo certo. Nenhum problema encontrado.'));
     issues.forEach(function (i) { lb.append(h('div', { class: 'lint ' + i.lvl }, (i.lvl === 'err' ? '✕ ' : '⚠ ') + i.msg)); });
-    var ta = h('textarea', { class: 'code', readonly: true, spellcheck: 'false' });
-    ta.value = html;
-    modal('Exportar HTML', h('div', null, lb, ta, h('div', { class: 'hint' }, 'Tamanho: ' + Math.round(html.length / 1024) + ' KB (o Gmail corta e-mails acima de ~102 KB).')), function (close) {
+
+    var mode = 'nice', sel = 0;
+    var codeEl = h('code');
+    var view = h('pre', { class: 'codeview', tabindex: '0' }, codeEl);
+    var info = h('div', { class: 'hint' });
+    var kb = function (t) { return Math.max(1, Math.round(t.length / 1024)) + ' KB'; };
+    function current() {
+      var raw = sel === 0 ? full : parts[sel - 1].html;
+      return mode === 'nice' ? MSExport.pretty(raw) : raw;
+    }
+    function show() {
+      var raw = sel === 0 ? full : parts[sel - 1].html;
+      codeEl.innerHTML = MSExport.highlight(current());
+      view.scrollTop = 0;
+      info.textContent = (sel === 0 ? 'E-mail inteiro' : 'Parte selecionada') + ' · compacto: ' + kb(raw) + ' · legível: ' + kb(MSExport.pretty(raw)) +
+        '. O Gmail corta e-mails acima de ~102 KB (vale o tamanho compacto).';
+    }
+    var seg = h('div', { class: 'seg' });
+    [['nice', 'Legível (identado)'], ['min', 'Compacto (como é enviado)']].forEach(function (x, i) {
+      var bt = h('button', { class: i === 0 ? 'on' : '' }, x[1]);
+      bt.addEventListener('click', function () { mode = x[0]; $$('button', seg).forEach(function (q) { q.classList.remove('on'); }); bt.classList.add('on'); show(); });
+      seg.append(bt);
+    });
+    var pick = h('select', null, h('option', { value: 0 }, 'E-mail inteiro'),
+      parts.map(function (x, i) { return h('option', { value: i + 1 }, x.label); }));
+    pick.addEventListener('change', function () { sel = parseInt(pick.value, 10); show(); });
+    var bar = h('div', { class: 'btnrow', style: 'margin:0 0 10px;align-items:center' }, seg,
+      h('span', { class: 'hint', style: 'margin:0 0 0 6px' }, 'Ver / copiar:'), pick);
+    show();
+
+    modal('Exportar HTML', h('div', null, lb, bar, view, info), function (close) {
       return [
-        h('button', { class: 'btn', onclick: function () { ta.select(); copyText(html); toast('HTML copiado ✓'); } }, 'Copiar HTML'),
-        h('button', { class: 'btn primary', onclick: function () { download(slug(doc.name) + '.html', html, 'text/html'); } }, 'Baixar .html'),
+        h('button', { class: 'btn', onclick: function () { copyText(current()); toast(sel === 0 ? 'HTML copiado ✓' : 'Parte copiada ✓'); } }, 'Copiar o que está na tela'),
+        h('button', { class: 'btn primary', onclick: function () { download(slug(doc.name) + (sel === 0 ? '' : '-parte') + '.html', current(), 'text/html'); } }, 'Baixar .html'),
         h('button', { class: 'btn', onclick: close }, 'Fechar')
       ];
     });
