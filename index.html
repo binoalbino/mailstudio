@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mail Studio · LA Marketing</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="logo">MAIL STUDIO<small>LA Marketing</small></div>
+    <input id="doc-name" type="text" value="Novo e-mail" aria-label="Nome do e-mail">
+    <button class="btn" id="b-undo" title="Desfazer (Ctrl+Z)">↶</button>
+    <button class="btn" id="b-redo" title="Refazer (Ctrl+Y)">↷</button>
+    <span class="savestate" id="savestate"></span>
+    <span class="grow"></span>
+    <div class="seg" id="device">
+      <button data-d="desktop" class="on" title="Desktop">🖥 Desktop</button>
+      <button data-d="mobile" title="Celular">📱 Mobile</button>
+    </div>
+    <span class="grow"></span>
+    <button class="btn" id="b-tpl">Modelos</button>
+    <button class="btn" id="b-open">Abrir</button>
+    <button class="btn" id="b-save">Salvar projeto</button>
+    <button class="btn" id="b-cfg" title="Configurações do servidor">⚙</button>
+    <button class="btn" id="b-prev">Pré-visualizar</button>
+    <button class="btn primary" id="b-export">Exportar HTML</button>
+    <input type="file" id="f-open" accept=".json,application/json" hidden>
+  </header>
+
+  <aside id="rail"></aside>
+
+  <main id="stage"><div id="canvas" class="desktop"></div></main>
+
+  <aside id="panel">
+    <div class="tabs">
+      <button data-tab="sel" class="on">Seleção</button>
+      <button data-tab="global">Estilos globais</button>
+    </div>
+    <div id="panel-body"></div>
+  </aside>
+</div>
+<div id="modal-root"></div>
+<div id="toast"></div>
+
+<script src="assets/config.js"></script>
+<script src="assets/js/gifenc.js"></script>
+<script src="assets/js/countdown.js"></script>
+<script src="assets/js/export.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+services:
+  gif:
+    build: .
+    container_name: mailstudio-gif
+    restart: unless-stopped
+    environment:
+      UPLOAD_TOKEN: ${UPLOAD_TOKEN}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+    ports:
+      - "127.0.0.1:8081:80"
+    volumes:
+      - ms_uploads:/var/www/html/uploads
+      - ms_cache:/var/www/html/api/cache
+
+volumes:
+  ms_uploads:
+  ms_cache:
