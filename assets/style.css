@@ -230,3 +230,4 @@ body.in-editor #home{display:none}
 .th-soc{display:flex;gap:3px;justify-content:center;padding:3px}
 .th-soc i{width:14px;height:6px;border-radius:2px;background:#b7bccb}
 .tpl .th{height:170px;border-radius:8px;margin-bottom:10px}
+a.btn{text-decoration:none;display:inline-block;color:inherit}

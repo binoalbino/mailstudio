@@ -678,8 +678,10 @@
       var file = fi.files[0];
       if (!file) return;
       status.textContent = 'Enviando…';
-      uploadImage(file).then(function (url) {
-        b.src = url; changed({ panel: true }); commit(); toast('Imagem enviada ✓');
+      uploadImage(file).then(function (r) {
+        b.src = r.url; changed({ panel: true }); commit();
+        var kb = function (n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB'; };
+        toast(r.reused ? 'Imagem já existia no servidor, reaproveitada ✓' : 'Imagem enviada e otimizada ✓ (' + kb(r.original_bytes) + ' → ' + kb(r.bytes) + ')');
       }).catch(function (err) {
         status.textContent = err.message; status.className = 'hint warn';
         toast(err.message, true);
@@ -692,19 +694,14 @@
   function uploadImage(file) {
     var canServer = /^https?:/.test(cfg.apiBase) && cfg.token;
     if (!canServer) {
-      return new Promise(function (res, rej) {
-        if (file.size > 1.5 * 1024 * 1024) { rej(new Error('Para enviar imagens, defina o endereço do servidor e a senha em ⚙ Configurações.')); return; }
-        var fr = new FileReader();
-        fr.onload = function () { toast('Imagem só para visualização (base64). Configure o servidor para exportar.', true); res(fr.result); };
-        fr.onerror = function () { rej(new Error('Não foi possível ler o arquivo.')); };
-        fr.readAsDataURL(file);
-      });
+      return Promise.reject(new Error('Para enviar imagens, informe a senha do servidor em ⚙ Configurações. O e-mail precisa de imagem hospedada, não embutida.'));
     }
+    if (file.size > 5 * 1024 * 1024) return Promise.reject(new Error('A imagem tem mais de 5 MB. Reduza o tamanho e tente de novo.'));
     var fd = new FormData();
     fd.append('file', file);
     return fetch(cfg.apiBase + 'upload.php', { method: 'POST', headers: { 'X-Token': cfg.token }, body: fd })
       .then(function (r) { return r.json().catch(function () { throw new Error('Resposta inválida do servidor.'); }); })
-      .then(function (j) { if (!j.ok) throw new Error(j.error || 'Falha no upload.'); return j.url; });
+      .then(function (j) { if (!j.ok) throw new Error(j.error || 'Falha no upload.'); return j; });
   }
 
   var PANELS = {};
@@ -945,6 +942,87 @@
     });
   }
 
+  /* ----- compartilhar prévia com o cliente ----- */
+  function currentDocId() {
+    var m = /^#\/e\/([a-z0-9]+)$/.exec(location.hash);
+    return m ? m[1] : null;
+  }
+  function shareApi(action, id, method, body) {
+    var opt = { method: method, headers: { 'X-Token': cfg.token } };
+    if (body) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+    return fetch(cfg.apiBase + 'share.php?a=' + action + '&id=' + encodeURIComponent(id), opt)
+      .then(function (r) { return r.json().catch(function () { throw new Error('Resposta inválida do servidor. Atualize o servidor (docker compose up -d --build).'); }); })
+      .then(function (j) { if (!j.ok) throw new Error(j.error || 'Falha ao compartilhar.'); return j; });
+  }
+  function openShare() {
+    var id = currentDocId();
+    if (!/^https?:/.test(cfg.apiBase) || !cfg.token) {
+      toast('Para compartilhar, informe o servidor e a senha em ⚙ Configurações.', true);
+      openConfig();
+      return;
+    }
+    if (!id) { toast('Abra um e-mail salvo para compartilhar.', true); return; }
+    var box = h('div', null, h('div', { class: 'hint' }, 'Carregando…'));
+    var closeFn = modal('Compartilhar prévia com o cliente', box, function (close) {
+      closeFn = close;
+      return [h('button', { class: 'btn', onclick: close }, 'Fechar')];
+    }, 'sm');
+    var fmt = function (ts) { return new Date(ts * 1000).toLocaleDateString('pt-BR'); };
+
+    function draw(info) {
+      var url = cfg.apiBase + 'ver.php?t=' + info.token;
+      var live = info.shared && !info.expired;
+      var days = h('select', null,
+        [[7, '7 dias'], [15, '15 dias'], [30, '30 dias'], [90, '90 dias']].map(function (o) {
+          return h('option', { value: o[0], selected: o[0] === 30 }, o[1]);
+        }));
+      var status = h('div', { class: 'hint' });
+      var issues = MSExport.lint(doc, { apiBase: cfg.apiBase }).filter(function (i) { return i.lvl === 'err'; });
+
+      function publish() {
+        status.className = 'hint'; status.textContent = 'Publicando…';
+        var html = MSExport.buildHtml(doc, { apiBase: cfg.apiBase });
+        shareApi('put', id, 'POST', { html: html, name: doc.name, days: parseInt(days.value, 10) })
+          .then(function (j) { toast(live ? 'Link atualizado com a versão atual ✓' : 'Link criado ✓'); box.innerHTML = ''; box.append(draw(j)); })
+          .catch(function (e) { status.className = 'hint warn'; status.textContent = e.message; });
+      }
+      function stop() {
+        if (!confirm('Desativar o link? Quem tiver o link deixa de ver a prévia.')) return;
+        shareApi('del', id, 'POST').then(function (j) { toast('Link desativado'); box.innerHTML = ''; box.append(draw(j)); })
+          .catch(function (e) { status.className = 'hint warn'; status.textContent = e.message; });
+      }
+
+      var out = h('div', null);
+      if (live) {
+        var inp = h('input', { type: 'text', readonly: true, value: url });
+        inp.addEventListener('focus', function () { inp.select(); });
+        out.append(
+          wrapF('Link para enviar ao cliente', inp),
+          h('div', { class: 'btnrow', style: 'margin-top:0' },
+            h('button', { class: 'btn primary sm', onclick: function () { inp.select(); copyText(url); toast('Link copiado ✓'); } }, 'Copiar link'),
+            h('a', { class: 'btn sm', href: 'https://wa.me/?text=' + encodeURIComponent('Prévia do e-mail "' + (doc.name || 'E-mail') + '" para aprovação: ' + url), target: '_blank', rel: 'noopener' }, 'Enviar por WhatsApp'),
+            h('a', { class: 'btn sm', href: url, target: '_blank', rel: 'noopener' }, 'Abrir')),
+          h('div', { class: 'hint' }, 'Atualizado em ' + fmt(info.updated) + ' · válido até ' + fmt(info.expires) + ' · ' +
+            (info.views ? info.views + (info.views === 1 ? ' visualização' : ' visualizações') + ' (última em ' + fmt(info.last_view) + ')' : 'ainda não foi aberto')),
+          h('div', { class: 'hint' }, 'Mudou algo no e-mail? Clique em "Atualizar" e o mesmo link passa a mostrar a versão nova.'));
+      } else if (info.shared && info.expired) {
+        out.append(h('div', { class: 'hint warn' }, 'O link anterior expirou em ' + fmt(info.expires) + '. Gere de novo para reativar.'));
+      } else {
+        out.append(h('div', { class: 'hint' }, 'Gera um link privado com a prévia deste e-mail, no formato que o destinatário vai receber. O cliente vê no computador ou no celular, sem precisar de conta.'));
+      }
+      if (issues.length) out.append(h('div', { class: 'hint warn' }, '⚠ O e-mail tem ' + issues.length + ' problema(s) a corrigir antes do envio. Veja em Exportar HTML.'));
+      out.append(wrapF('Validade do link', days));
+      out.append(h('div', { class: 'btnrow' },
+        h('button', { class: 'btn ' + (live ? '' : 'primary'), onclick: publish }, live ? 'Atualizar com a versão atual' : 'Gerar link'),
+        live ? h('button', { class: 'btn sm', onclick: stop }, 'Desativar link') : null),
+        status);
+      return out;
+    }
+
+    shareApi('info', id, 'GET').then(function (j) { box.innerHTML = ''; box.append(draw(j)); })
+      .catch(function (e) { box.innerHTML = ''; box.append(h('div', { class: 'hint warn' }, e.message)); });
+  }
+
   /* ----- configurações ----- */
   function openConfig() {
     var api = h('input', { type: 'text', value: cfg.apiBase, placeholder: 'https://mailstudio.lamarketing.com.br/api/' });
@@ -984,6 +1062,7 @@
   $('#b-undo').addEventListener('click', undo);
   $('#b-redo').addEventListener('click', redo);
   $('#b-prev').addEventListener('click', openPreview);
+  $('#b-share').addEventListener('click', openShare);
   $('#b-export').addEventListener('click', openExport);
   $('#b-cfg').addEventListener('click', openConfig);
   $('#b-save').addEventListener('click', function () { download(slug(doc.name) + '.mailstudio.json', JSON.stringify(doc, null, 2), 'application/json'); toast('Backup baixado'); });
