@@ -353,7 +353,10 @@
   /* ================= eventos do canvas ================= */
   var canvasEl = $('#canvas');
 
+  // No editor, links (imagem, botão, cronômetro...) não abrem: o clique só seleciona o bloco para editar.
+  canvasEl.addEventListener('auxclick', function (e) { if (e.target.closest('a')) e.preventDefault(); });
   canvasEl.addEventListener('click', function (e) {
+    if (e.target.closest('a')) e.preventDefault();
     var act = e.target.closest('[data-act]');
     if (act) {
       var a = act.dataset.act, rid = act.dataset.row;
@@ -1018,7 +1021,7 @@
             (emb ? 'Há ' + emb + ' imagem(ns) embutida(s) no e-mail (enviadas antes de configurar a senha do servidor). Envie essas imagens de novo pelo botão "Enviar imagem" para que fiquem hospedadas.' : 'Confira o tamanho em Exportar HTML.');
           return;
         }
-        shareApi('put', id, 'POST', { html: html, name: doc.name, days: parseInt(days.value, 10) })
+        shareApi('put', id, 'POST', { html: html, name: doc.name, title: (doc.settings.title || '').trim(), preheader: (doc.settings.preheader || '').trim(), days: parseInt(days.value, 10) })
           .then(function (j) { toast(live ? 'Link atualizado com a versão atual ✓' : 'Link criado ✓'); box.innerHTML = ''; box.append(draw(j)); })
           .catch(function (e) { status.className = 'hint warn'; status.textContent = e.message; });
       }

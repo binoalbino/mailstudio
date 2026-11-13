@@ -139,6 +139,8 @@ if ($a === 'put' && $method === 'POST') {
     $now = time();
     $m = [
         'name' => mb_substr(trim((string) ($j['name'] ?? 'E-mail')), 0, 120),
+        'title' => mb_substr(trim((string) ($j['title'] ?? '')), 0, 200),
+        'preheader' => mb_substr(trim((string) ($j['preheader'] ?? '')), 0, 300),
         'html' => $j['html'],
         'created' => $old['created'] ?? $now,
         'updated' => $now,

@@ -64,7 +64,10 @@ if (!preg_match('/bot|crawl|spider|facebookexternalhit|whatsapp|slack|telegram|p
     }
 }
 
-$name = htmlspecialchars($m['name'] ?: 'E-mail', ENT_QUOTES, 'UTF-8');
+// Título e pré-cabeçalho definidos na edição (se vazios, usa o nome do e-mail / um texto padrão).
+$title = trim((string) ($m['title'] ?? '')) !== '' ? $m['title'] : ($m['name'] ?: 'E-mail');
+$name = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
+$pre = htmlspecialchars(trim((string) ($m['preheader'] ?? '')) !== '' ? $m['preheader'] : 'Prévia para aprovação', ENT_QUOTES, 'UTF-8');
 $until = date('d/m/Y', (int) $m['expires']);
 $rawUrl = htmlspecialchars('?t=' . $t . '&raw=1', ENT_QUOTES, 'UTF-8');
 
@@ -96,14 +99,14 @@ footer{text-align:center;color:#7a8190;font-size:12px;padding:8px 12px 12px}
 </head>
 <body>
 <header>
-  <div class="t"><?= $name ?><small>Prévia para aprovação · o cronômetro mostra o tempo real restante</small></div>
+  <div class="t"><?= $name ?><small><?= $pre ?></small></div>
   <div class="seg" id="seg">
     <button type="button" data-m="" class="on">🖥 Computador</button>
     <button type="button" data-m="mobile">📱 Celular</button>
   </div>
 </header>
 <main><iframe id="f" src="<?= $rawUrl ?>" title="<?= $name ?>" sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe></main>
-<footer>Link privado, válido até <?= $until ?>.</footer>
+<footer>Prévia para aprovação · o cronômetro mostra o tempo real restante · link privado, válido até <?= $until ?>.</footer>
 <script>
 (function(){
   var f=document.getElementById('f'),b=document.querySelectorAll('#seg button');
