@@ -982,6 +982,13 @@
       function publish() {
         status.className = 'hint'; status.textContent = 'Publicando…';
         var html = MSExport.buildHtml(doc, { apiBase: cfg.apiBase });
+        if (html.length > 1500000) {
+          var emb = (html.match(/src="data:/g) || []).length;
+          status.className = 'hint warn';
+          status.textContent = 'O e-mail tem ' + Math.round(html.length / 1024) + ' KB, grande demais para compartilhar (o ideal é abaixo de 100 KB). ' +
+            (emb ? 'Há ' + emb + ' imagem(ns) embutida(s) no e-mail (enviadas antes de configurar a senha do servidor). Envie essas imagens de novo pelo botão "Enviar imagem" para que fiquem hospedadas.' : 'Confira o tamanho em Exportar HTML.');
+          return;
+        }
         shareApi('put', id, 'POST', { html: html, name: doc.name, days: parseInt(days.value, 10) })
           .then(function (j) { toast(live ? 'Link atualizado com a versão atual ✓' : 'Link criado ✓'); box.innerHTML = ''; box.append(draw(j)); })
           .catch(function (e) { status.className = 'hint warn'; status.textContent = e.message; });
