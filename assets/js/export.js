@@ -205,7 +205,10 @@
         '.ms-hide-m{display:none!important;max-height:0!important;overflow:hidden!important;}',
         '}');
     }
-    var pre = s.preheader ? '<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">' + esc(s.preheader) + '&#8199;&#847;&zwnj;&nbsp;&#8199;&#847;&zwnj;&nbsp;&#8199;&#847;&zwnj;&nbsp;</div>' : '';
+    // Preenche o resto da linha de prévia com caracteres invisíveis, para o texto do corpo do e-mail não aparecer depois do pré-cabeçalho.
+    var padReps = Math.max(80, Math.ceil((320 - String(s.preheader || '').length) / 4));
+    var padding = new Array(padReps + 1).join('&#8199;&#847;&zwnj;&nbsp;');
+    var pre = s.preheader ? '<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">' + esc(s.preheader) + padding + '</div>' : '';
     var ghostOpen = s.align === 'center' ? '<!--[if mso]><table role="presentation" width="' + W + '" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->' : '';
     var ghostClose = s.align === 'center' ? '<!--[if mso]></td></tr></table><![endif]-->' : '';
 
